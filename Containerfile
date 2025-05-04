@@ -57,6 +57,6 @@ HEALTHCHECK --interval=1m --timeout=30s --start-period=5m --retries=3 \
   CMD curl --fail --insecure https://localhost:8443/status || exit 1
 
 # Metadata labels (optional)
-LABEL org.opencontainers.image.title="UniFi Network Application Server (Latest)" \
-      org.opencontainers.image.description="Self-built container for the latest UniFi Network Application with MongoDB 8.0" \
-      org.opencontainers.image.source="https://github.com/fizlian-dev/podman-unifi-latest" # Updated Example URL
+#LABEL org.opencontainers.image.title="UniFi Network Application Server (Latest)" \
+#     org.opencontainers.image.description="Self-built container for the latest UniFi Network Application with MongoDB 8.0" \
+#      org.opencontainers.image.source="https://github.com/fizlian-dev/podman-unifi-latest" # Updated Example URL
