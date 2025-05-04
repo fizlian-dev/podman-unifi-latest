@@ -5,7 +5,7 @@ Podman Container for the latest version of the Unifi Network Server
   
 podman build \
   -t my-unifi:latest \
-  https://github.com/fizlian-dev/podman-unifi-latest.git#main
+  https://github.com/fizlian-dev/podman-unifi-latest
 
   # Example location, choose what suits you
   
