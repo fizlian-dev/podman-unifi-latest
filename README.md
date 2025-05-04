@@ -10,7 +10,7 @@ podman build \
   # Example location, choose what suits you
   
 HOST_DATA_PATH="$HOME/podman_volumes/unifi-latest"
-mkdir -p ${HOST_DATA_PATH}/{data,logs,cert}
+<mkdir -p ${HOST_DATA_PATH}/{data,logs,cert}>
 
   # Use the UID/GID matching the PUID/PGID used during build (default 999)
   
