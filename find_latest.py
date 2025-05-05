@@ -5,17 +5,19 @@ import requests
 import re
 from bs4 import BeautifulSoup
 from packaging import version
-sys.stdout.flush() # Force flush after imports
+sys.stdout.flush()
 
 try:
     print("--- Importing complete ---")
     sys.stdout.flush()
     url = "https://ui.com/download/releases/network-server"
-    title_pattern = re.compile(r"Download v (\d+\.\d+\.\d+) \(Linux\)")
-    href_base_pattern = "https://dl.ui.com/unifi/"
+    # Regex to find title like "v 9.1.120 (Linux)" and extract version
+    version_pattern_in_title = re.compile(r"v (\d+\.\d+\.\d+) \(Linux\)")
+    base_dl_url = "https://dl.ui.com/unifi"
     filename = "unifi_sysvinit_all.deb"
-    latest_version = version.parse("0.0.0")
-    latest_url = None
+
+    latest_found_version = version.parse("0.0.0")
+    found_versions = []
 
     print(f"--- Fetching {url} ---")
     sys.stdout.flush()
@@ -26,64 +28,47 @@ try:
     response.raise_for_status()
     html_text = response.text
     print(f"--- HTML fetched, length: {len(html_text)} characters ---")
-    # print(f"--- HTML start: {html_text[:500]} ---") # Optional: uncomment to see start of HTML
     sys.stdout.flush()
 
     soup = BeautifulSoup(html_text, 'lxml')
     print("--- HTML parsed with BeautifulSoup (lxml) ---")
     sys.stdout.flush()
 
-    links = soup.find_all('a')
-    print(f"--- Found {len(links)} total 'a' tags ---")
+    # Find H6 tags potentially containing the version in the title
+    h6_tags = soup.find_all('h6')
+    print(f"--- Found {len(h6_tags)} total 'h6' tags ---")
+    print(f"--- Searching H6 tags for title pattern: '{version_pattern_in_title.pattern}' ---")
     sys.stdout.flush()
 
-    if not links:
-        print("ERROR: No 'a' tags found.")
-        sys.stdout.flush()
-        sys.exit(1)
-
-    found_candidates = []
-    print("--- Searching for links matching title and href patterns ---")
-    sys.stdout.flush()
-    for link in links:
-        link_title = link.get('title', '')
-        href = link.get('href', '')
-        # DEBUG: Print all links being checked
-        # print(f"  DEBUG: Checking link: title='{link_title}', href='{href}'")
-        # sys.stdout.flush()
-
-        title_match = title_pattern.search(link_title)
-
-        if title_match and href and href.startswith(href_base_pattern) and href.endswith(filename):
-            current_version_str = title_match.group(1)
+    for tag in h6_tags:
+        title = tag.get('title', '')
+        match = version_pattern_in_title.search(title)
+        if match:
+            current_version_str = match.group(1)
             try:
                 current_version = version.parse(current_version_str)
-                print(f"  +++ Found candidate: Version {current_version_str}, URL {href}")
+                print(f"  Found candidate version in title: {current_version_str}")
                 sys.stdout.flush()
-                found_candidates.append({'version': current_version, 'url': href})
+                found_versions.append(current_version)
             except version.InvalidVersion:
-                print(f"  --- Skipping link with invalid version format in title: {link_title}")
+                print(f"  Skipping invalid version format in title: {current_version_str}")
                 sys.stdout.flush()
-        # else: # DEBUG: Optionally print why a link didn't match
-            # if not title_match: print(f"  --- Title mismatch: '{link_title}'")
-            # if not href: print(f"  --- Href missing")
-            # if not href.startswith(href_base_pattern): print(f"  --- Href base mismatch: '{href}'")
-            # if not href.endswith(filename): print(f"  --- Href filename mismatch: '{href}'")
-            # sys.stdout.flush()
 
-
-    if not found_candidates:
-        print("ERROR: No valid download links found matching ALL patterns.")
+    if not found_versions:
+        print(f"ERROR: Could not parse any valid versions from matching h6 tags.")
         sys.stdout.flush()
         sys.exit(1)
 
-    latest_candidate = max(found_candidates, key=lambda x: x['version'])
-    latest_version = latest_candidate['version']
-    latest_url = latest_candidate['url']
-
-    print(f"--- Selected latest version: {latest_version} ---")
-    print(f"--- Selected URL: {latest_url} ---")
+    # Find the highest version among candidates
+    latest_found_version = max(found_versions)
+    print(f"--- Determined latest version: {latest_found_version} ---")
     sys.stdout.flush()
+
+    # Construct the final URL
+    latest_url = f"{base_dl_url}/{latest_found_version}/{filename}"
+    print(f"--- Constructed URL: {latest_url} ---")
+    sys.stdout.flush()
+
     # Final print for capture by shell
     print(latest_url, end='')
     sys.exit(0)
