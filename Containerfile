@@ -2,7 +2,15 @@
 FROM python:3.11-slim-bookworm AS finder
 
 # Install dependencies for Python script
-RUN python3 ./find_latest.py
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip \
+        # Build deps for lxml if needed, or install binary version
+        build-essential python3-dev libxml2-dev libxslt1-dev && \
+    pip install --no-cache-dir requests beautifulsoup4 lxml packaging && \
+    # Clean up build deps if possible (might remove runtime deps needed by lxml?)
+    # apt-get purge -y build-essential python3-dev libxml2-dev libxslt1-dev && \
+    # apt-get autoremove -y --purge && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -13,15 +21,7 @@ RUN chmod +x find_latest.py
 # Execute the script and save the output URL
 # FRAGILE: This build stage will fail if the website structure changes
 # or if the script cannot reliably find the latest version URL.
-RUN \
-    echo "Running Python script to find latest UniFi URL..." && \
-    LATEST_DEB_URL=$(python3 ./find_latest.py) && \
-    if [ -z "$LATEST_DEB_URL" ]; then \
-        echo "ERROR: Python script failed to output a URL."; \
-        exit 1; \
-    fi && \
-    echo "Script found URL: ${LATEST_DEB_URL}" && \
-    echo "${LATEST_DEB_URL}" > /tmp/unifi_url.txt
+RUN python3 /app/find_latest.py
 
 # Stage 2: Build the actual image using the found URL
 FROM debian:bookworm-slim
