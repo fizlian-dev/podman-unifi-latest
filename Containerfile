@@ -1,32 +1,34 @@
-# Stage 1: Find Latest UniFi Version and URL using Link Title Attribute
-FROM debian:bookworm-slim AS finder
+# Stage 1: Find Latest UniFi URL using Python
+FROM python:3.11-slim-bookworm AS finder
 
-# Install tools needed for scraping
+# Install dependencies for Python script
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl ca-certificates grep sed && \
+        python3-pip \
+        # Build deps for lxml if needed, or install binary version
+        build-essential python3-dev libxml2-dev libxslt1-dev && \
+    pip install --no-cache-dir requests beautifulsoup4 lxml packaging && \
+    # Clean up build deps if possible (might remove runtime deps needed by lxml?)
+    # apt-get purge -y build-essential python3-dev libxml2-dev libxslt1-dev && \
+    # apt-get autoremove -y --purge && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Attempt to find the latest .deb download URL by parsing the link title
-# FRAGILE: This relies on the specific title attribute format "Download v X.Y.Z (Linux)"
+WORKDIR /app
+
+# Copy the Python script into the finder stage
+COPY find_latest.py .
+RUN chmod +x find_latest.py
+
+# Execute the script and save the output URL
+# FRAGILE: This build stage will fail if the website structure changes
+# or if the script cannot reliably find the latest version URL.
 RUN \
-    TARGET_URL="https://ui.com/download/releases/network-server" && \
-    echo "Attempting to find latest UniFi .deb version from ${TARGET_URL}..." && \
-    # Extract version number X.Y.Z from the first link matching the title pattern
-    # Assumes the first match corresponds to the latest version listed.
-    VERSION=$(curl -sSL "${TARGET_URL}" | \
-              grep -oP 'title="Download v (\d+\.\d+\.\d+) \(Linux\)"' | \
-              head -n 1 | \
-              sed -n 's/.* v \([0-9.]*\) .*/\1/p') && \
-    # Check if version was found
-    if [ -z "$VERSION" ]; then \
-        echo "ERROR: Could not extract latest version number using title attribute from ${TARGET_URL}. Scraping failed."; \
+    echo "Running Python script to find latest UniFi URL..." && \
+    LATEST_DEB_URL=$(python3 ./find_latest.py) && \
+    if [ -z "$LATEST_DEB_URL" ]; then \
+        echo "ERROR: Python script failed to output a URL."; \
         exit 1; \
     fi && \
-    # Construct the URL based on the identified pattern
-    LATEST_DEB_URL="https://dl.ui.com/unifi/${VERSION}/unifi_sysvinit_all.deb" && \
-    echo "Found Version: ${VERSION}" && \
-    echo "Constructed URL: ${LATEST_DEB_URL}" && \
-    # Save the found URL to a file for the next stage
+    echo "Script found URL: ${LATEST_DEB_URL}" && \
     echo "${LATEST_DEB_URL}" > /tmp/unifi_url.txt
 
 # Stage 2: Build the actual image using the found URL
