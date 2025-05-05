@@ -2,15 +2,7 @@
 FROM python:3.11-slim-bookworm AS finder
 
 # Install dependencies for Python script
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3-pip \
-        # Build deps for lxml if needed, or install binary version
-        build-essential python3-dev libxml2-dev libxslt1-dev && \
-    pip install --no-cache-dir requests beautifulsoup4 lxml packaging && \
-    # Clean up build deps if possible (might remove runtime deps needed by lxml?)
-    # apt-get purge -y build-essential python3-dev libxml2-dev libxslt1-dev && \
-    # apt-get autoremove -y --purge && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN python3 /app/find_latest.py
 
 WORKDIR /app
 
