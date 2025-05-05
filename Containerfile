@@ -2,7 +2,7 @@
 FROM python:3.11-slim-bookworm AS finder
 
 # Install dependencies for Python script
-RUN python3 /app/find_latest.py
+RUN python3 ./find_latest.py
 
 WORKDIR /app
 
