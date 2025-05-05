@@ -96,7 +96,7 @@ if ! pgrep -f mongod > /dev/null; then
     echo "Starting MongoDB..."
     rm -f "$MONGO_LOCK_FILE"
     # Use gosu to run as the mongodb user
-    gosu mongodb:mongodb mongod --dbpath /var/lib/mongodb --logpath ${MONGO_LOG_FILE} --logappend --fork
+    gosu mongodb:mongodb mongod --dbpath /var/lib/mongodb --logpath ${MONGO_LOG_FILE} --logappend
     # Wait for MongoDB to be ready
     echo "Waiting for MongoDB to start..."
     WAIT_COUNT=0
