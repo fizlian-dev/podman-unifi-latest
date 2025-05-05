@@ -17,15 +17,7 @@ RUN chmod +x find_latest.py
 # Execute the script and save the output URL
 # FRAGILE: This build stage will fail if the website structure changes
 # or if the script cannot reliably find the latest version URL.
-RUN \
-    echo "Running Python script to find latest UniFi URL..." && \
-    LATEST_DEB_URL=$(python3 ./find_latest.py) && \
-    if [ -z "$LATEST_DEB_URL" ]; then \
-        echo "ERROR: Python script failed to output a URL."; \
-        exit 1; \
-    fi && \
-    echo "Script found URL: ${LATEST_DEB_URL}" && \
-    echo "${LATEST_DEB_URL}" > /tmp/unifi_url.txt
+RUN python3 -u /app/find_latest.py
 
 # Stage 2: Build the actual image using the found URL
 FROM debian:bookworm-slim
