@@ -3,63 +3,76 @@ import requests
 import re
 from bs4 import BeautifulSoup
 from packaging import version
+import sys
 
-# Target URL provided by user
+# Target URL
 url = "https://ui.com/download/releases/network-server"
-# Base URL for constructing download links if needed (seems hrefs are absolute now)
-# base_dl_url = "https://dl.ui.com"
-# Expected filename pattern
-filename_pattern = "unifi_sysvinit_all" # Part of the expected .deb filename
+# Regex to find title and extract version X.Y.Z
+title_pattern = re.compile(r"Download v (\d+\.\d+\.\d+) \(Linux\)")
+# Base URL pattern for download links to verify href
+href_base_pattern = "https://dl.ui.com/unifi/"
+# Expected filename
+filename = "unifi_sysvinit_all.deb"
 
 latest_version = version.parse("0.0.0")
 latest_url = None
 
-print(f"Fetching release list from {url}...")
+print(f"Attempting to fetch and parse {url}...")
 
 try:
-    response = requests.get(url, timeout=30)
-    response.raise_for_status() # Raise an exception for bad status codes
+    # Add a common User-Agent header
+    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36'}
+    response = requests.get(url, timeout=30, headers=headers)
+    response.raise_for_status() # Check for HTTP errors
     soup = BeautifulSoup(response.text, 'lxml') # Use lxml parser
 
-    # Find all links with a title matching the expected pattern
-    # Example title: "Download v 9.1.120 (Linux)"
-    version_pattern = re.compile(r"Download v (\d+\.\d+\.\d+) \(Linux\)")
-    links = soup.find_all('a', title=version_pattern)
+    links = soup.find_all('a') # Find all links
 
     if not links:
-        print("ERROR: No links matching the title pattern found.")
-        exit(1)
+        print(f"ERROR: No 'a' tags found on the page {url}.")
+        sys.exit(1)
 
-    print(f"Found {len(links)} potential download links...")
+    print(f"Found {len(links)} total 'a' tags. Searching for latest Linux .deb download link...")
+    found_candidates = []
 
     for link in links:
-        match = version_pattern.search(link.get('title', ''))
+        link_title = link.get('title', '')
         href = link.get('href', '')
 
-        if match and href and filename_pattern in href and href.endswith(".deb"):
-            current_version_str = match.group(1)
-            current_version = version.parse(current_version_str)
-            print(f"  Found version {current_version_str} with URL {href}")
+        # Check if title attribute matches the desired pattern
+        title_match = title_pattern.search(link_title)
 
-            # Check if this version is newer than the latest found so far
-            if current_version > latest_version:
-                latest_version = current_version
-                latest_url = href
-                print(f"    -> New latest version found: {latest_version}")
+        # Check if title matched AND href seems valid
+        if title_match and href and href.startswith(href_base_pattern) and href.endswith(filename):
+            current_version_str = title_match.group(1)
+            try:
+                current_version = version.parse(current_version_str)
+                print(f"  Found candidate: Version {current_version_str}, URL {href}")
+                found_candidates.append({'version': current_version, 'url': href})
+            except version.InvalidVersion:
+                print(f"  Skipping link with invalid version format in title: {link_title}")
 
-    if latest_url:
-        print(f"Selected latest version: {latest_version}")
-        print(f"Selected URL: {latest_url}")
-        # Write the final URL to stdout for the Dockerfile RUN command
-        print(latest_url, end='') # Print only the URL for capture
-        exit(0)
-    else:
-        print("ERROR: Could not determine the latest valid download URL from found links.")
-        exit(1)
+    if not found_candidates:
+        print(f"ERROR: No valid download links found matching the pattern.")
+        sys.exit(1)
+
+    # Find the candidate with the highest version number
+    latest_candidate = max(found_candidates, key=lambda x: x['version'])
+    latest_version = latest_candidate['version']
+    latest_url = latest_candidate['url']
+
+    print(f"Selected latest version: {latest_version}")
+    print(f"Selected URL: {latest_url}")
+    # Print *only* the final URL to stdout for the Containerfile
+    print(latest_url, end='')
+    sys.exit(0) # Exit successfully
 
 except requests.exceptions.RequestException as e:
     print(f"ERROR: Failed to fetch URL {url}: {e}")
-    exit(1)
+    sys.exit(1)
+except ImportError:
+    print("ERROR: Required Python libraries (requests, bs4, packaging, lxml) not found.")
+    sys.exit(1)
 except Exception as e:
-    print(f"ERROR: An unexpected error occurred during parsing: {e}")
-    exit(1)
+    print(f"ERROR: An unexpected error occurred: {e}")
+    sys.exit(1)
